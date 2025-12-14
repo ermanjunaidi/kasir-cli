@@ -174,3 +174,46 @@ func deleteUser() {
 
 	fmt.Println("✅ User berhasil dihapus!")
 }
+
+// ChangePassword menangani proses ubah password user
+func ChangePassword() {
+	fmt.Println("\n═══ UBAH PASSWORD ═══")
+
+	// 1. Verifikasi Password Lama
+	fmt.Print("Password Lama: ")
+	oldPassword, _ := reader.ReadString('\n')
+	oldPassword = strings.TrimSpace(oldPassword)
+
+	// Cek password lama dengan query sederhana ke DB atau field user saat ini
+	// Karena kita tidak menyimpan password plain text di struct User saat login (biasanya),
+	// kita cek manual ke DB untuk validasi credentials
+	if models.CurrentUser == nil {
+		fmt.Println("❌ Anda belum login!")
+		return
+	}
+
+	_, err := models.Login(models.CurrentUser.Username, oldPassword)
+	if err != nil {
+		fmt.Println("❌ Password lama salah!")
+		return
+	}
+
+	// 2. Input Password Baru
+	fmt.Print("Password Baru: ")
+	newPassword, _ := reader.ReadString('\n')
+	newPassword = strings.TrimSpace(newPassword)
+
+	if newPassword == "" {
+		fmt.Println("❌ Password baru tidak boleh kosong!")
+		return
+	}
+
+	// 3. Update Password
+	err = models.UpdatePassword(models.CurrentUser.ID, newPassword)
+	if err != nil {
+		fmt.Printf("❌ Gagal mengubah password: %v\n", err)
+		return
+	}
+
+	fmt.Println("✅ Password berhasil diubah!")
+}

@@ -127,3 +127,17 @@ func (u *User) GetWarehouseID() int {
 	}
 	return *u.WarehouseID
 }
+
+// UpdatePassword memperbarui password user
+func UpdatePassword(userID int, newPassword string) error {
+	result, err := config.DB.Exec("UPDATE users SET password = $1 WHERE id = $2", newPassword, userID)
+	if err != nil {
+		return err
+	}
+
+	rowsAffected, _ := result.RowsAffected()
+	if rowsAffected == 0 {
+		return errors.New("user tidak ditemukan")
+	}
+	return nil
+}

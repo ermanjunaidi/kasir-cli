@@ -69,6 +69,8 @@ func main() {
 				handlers.UserMenu()
 			case "5":
 				handlers.WarehouseMenu()
+			case "6":
+				handlers.ChangePassword()
 			case "0":
 				logout()
 				return
@@ -83,6 +85,8 @@ func main() {
 				listProductsOnly()
 			case "3":
 				handlers.ReportMenu()
+			case "4":
+				handlers.ChangePassword()
 			case "0":
 				logout()
 				return
@@ -120,6 +124,7 @@ func printAdminMenu() {
 	fmt.Println("║  3. 📊 Laporan Penjualan             ║")
 	fmt.Println("║  4. 👥 Manajemen User                ║")
 	fmt.Println("║  5. 🏭 Manajemen Gudang              ║")
+	fmt.Println("║  6. 🔑 Ubah Password                 ║")
 	fmt.Println("║  0. 🚪 Logout                        ║")
 	fmt.Println("╚══════════════════════════════════════╝")
 }
@@ -141,6 +146,7 @@ func printUserMenu() {
 	fmt.Println("║  1. 🛒 Transaksi Baru                ║")
 	fmt.Println("║  2. 📦 Lihat Produk                  ║")
 	fmt.Println("║  3. 📊 Laporan Penjualan             ║")
+	fmt.Println("║  4. 🔑 Ubah Password                 ║")
 	fmt.Println("║  0. 🚪 Logout                        ║")
 	fmt.Println("╚══════════════════════════════════════╝")
 }
