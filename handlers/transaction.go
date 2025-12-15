@@ -58,68 +58,79 @@ func TransactionMenu() {
 func addToCart(cart *[]models.CartItem) {
 	listProducts()
 
-	fmt.Print("\nMasukkan ID produk: ")
-	idStr := readInput()
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		fmt.Println("❌ ID tidak valid!")
-		return
-	}
-
-	product, err := models.GetProductByID(id)
-	if err != nil {
-		fmt.Println("❌ Produk tidak ditemukan!")
-		return
-	}
-
-	// Cek akses warehouse untuk user biasa
-	if models.CurrentUser != nil && !models.CurrentUser.IsAdmin() {
-		if models.CurrentUser.WarehouseID != nil && product.WarehouseID != *models.CurrentUser.WarehouseID {
-			fmt.Println("❌ Produk tidak tersedia di gudang Anda!")
-			return
+	for {
+		fmt.Print("\nMasukkan ID produk (atau '0' untuk kembali): ")
+		idStr := readInput()
+		if idStr == "0" {
+			break
 		}
-	}
 
-	fmt.Printf("Produk: %s (Stok: %d, Harga: %s)\n", product.Name, product.Stock, formatRupiah(product.SellingPrice))
-	fmt.Print("Jumlah: ")
-	qtyStr := readInput()
-	qty, err := strconv.Atoi(qtyStr)
-	if err != nil || qty <= 0 {
-		fmt.Println("❌ Jumlah tidak valid!")
-		return
-	}
-
-	// Cek stok yang tersedia (dikurangi yang sudah di cart)
-	availableStock := product.Stock
-	for _, item := range *cart {
-		if item.Product.ID == product.ID {
-			availableStock -= item.Quantity
+		id, err := strconv.Atoi(idStr)
+		if err != nil {
+			fmt.Println("❌ ID tidak valid!")
+			continue
 		}
-	}
 
-	if qty > availableStock {
-		fmt.Printf("❌ Stok tidak mencukupi! Tersedia: %d\n", availableStock)
-		return
-	}
+		product, err := models.GetProductByID(id)
+		if err != nil {
+			fmt.Println("❌ Produk tidak ditemukan!")
+			continue
+		}
 
-	// Cek apakah produk sudah ada di cart
-	found := false
-	for i, item := range *cart {
-		if item.Product.ID == product.ID {
-			(*cart)[i].Quantity += qty
-			found = true
+		// Cek akses warehouse untuk user biasa
+		if models.CurrentUser != nil && !models.CurrentUser.IsAdmin() {
+			if models.CurrentUser.WarehouseID != nil && product.WarehouseID != *models.CurrentUser.WarehouseID {
+				fmt.Println("❌ Produk tidak tersedia di gudang Anda!")
+				continue
+			}
+		}
+
+		fmt.Printf("Produk: %s (Stok: %d, Harga: %s)\n", product.Name, product.Stock, formatRupiah(product.SellingPrice))
+		fmt.Print("Jumlah: ")
+		qtyStr := readInput()
+		qty, err := strconv.Atoi(qtyStr)
+		if err != nil || qty <= 0 {
+			fmt.Println("❌ Jumlah tidak valid!")
+			continue
+		}
+
+		// Cek stok yang tersedia (dikurangi yang sudah di cart)
+		availableStock := product.Stock
+		for _, item := range *cart {
+			if item.Product.ID == product.ID {
+				availableStock -= item.Quantity
+			}
+		}
+
+		if qty > availableStock {
+			fmt.Printf("❌ Stok tidak mencukupi! Tersedia: %d\n", availableStock)
+			continue
+		}
+
+		// Cek apakah produk sudah ada di cart
+		found := false
+		for i, item := range *cart {
+			if item.Product.ID == product.ID {
+				(*cart)[i].Quantity += qty
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			*cart = append(*cart, models.CartItem{
+				Product:  product,
+				Quantity: qty,
+			})
+		}
+
+		fmt.Printf("✅ %s x%d ditambahkan ke keranjang\n", product.Name, qty)
+
+		fmt.Print("\nTambah produk lagi? (y/n): ")
+		if strings.ToLower(readInput()) != "y" {
 			break
 		}
 	}
-
-	if !found {
-		*cart = append(*cart, models.CartItem{
-			Product:  product,
-			Quantity: qty,
-		})
-	}
-
-	fmt.Printf("✅ %s x%d ditambahkan ke keranjang\n", product.Name, qty)
 }
 
 func viewCart(cart []models.CartItem) {
@@ -197,7 +208,7 @@ func processPayment(cart []models.CartItem) bool {
 	}
 
 	// Proses transaksi
-	transaction, err := models.CreateTransaction(cart, payment)
+	transaction, err := models.CreateTransaction(models.CurrentUser, cart, payment)
 	if err != nil {
 		fmt.Printf("❌ Gagal memproses transaksi: %v\n", err)
 		return false

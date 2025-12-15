@@ -21,6 +21,16 @@ var CurrentUser *User
 
 // Login melakukan validasi login
 func Login(username, password string) (*User, error) {
+	u, err := Authenticate(username, password)
+	if err != nil {
+		return nil, err
+	}
+	CurrentUser = u
+	return u, nil
+}
+
+// Authenticate memverifikasi username dan password
+func Authenticate(username, password string) (*User, error) {
 	var u User
 	var warehouseID *int
 
@@ -35,7 +45,6 @@ func Login(username, password string) (*User, error) {
 	}
 
 	u.WarehouseID = warehouseID
-	CurrentUser = &u
 	return &u, nil
 }
 

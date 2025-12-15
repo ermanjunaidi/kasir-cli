@@ -38,7 +38,7 @@ type CartItem struct {
 }
 
 // CreateTransaction membuat transaksi baru dengan items
-func CreateTransaction(items []CartItem, payment float64) (*Transaction, error) {
+func CreateTransaction(user *User, items []CartItem, payment float64) (*Transaction, error) {
 	// Hitung total dan profit
 	var total float64
 	var totalProfit float64
@@ -53,10 +53,10 @@ func CreateTransaction(items []CartItem, payment float64) (*Transaction, error) 
 	// Get user dan warehouse info
 	userID := 0
 	warehouseID := 0
-	if CurrentUser != nil {
-		userID = CurrentUser.ID
-		if CurrentUser.WarehouseID != nil {
-			warehouseID = *CurrentUser.WarehouseID
+	if user != nil {
+		userID = user.ID
+		if user.WarehouseID != nil {
+			warehouseID = *user.WarehouseID
 		} else if len(items) > 0 {
 			warehouseID = items[0].Product.WarehouseID
 		}
@@ -144,21 +144,21 @@ func CreateTransaction(items []CartItem, payment float64) (*Transaction, error) 
 }
 
 // GetTransactionsByDate mengambil transaksi berdasarkan tanggal
-func GetTransactionsByDate(date time.Time) ([]Transaction, error) {
+func GetTransactionsByDate(user *User, date time.Time) ([]Transaction, error) {
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	var query string
 	var args []interface{}
 
-	if CurrentUser != nil && !CurrentUser.IsAdmin() && CurrentUser.WarehouseID != nil {
+	if user != nil && !user.IsAdmin() && user.WarehouseID != nil {
 		query = `
 			SELECT id, user_id, warehouse_id, total, profit, payment, change, created_at 
 			FROM transactions 
 			WHERE created_at >= $1 AND created_at < $2 AND warehouse_id = $3
 			ORDER BY created_at DESC
 		`
-		args = []interface{}{startOfDay, endOfDay, *CurrentUser.WarehouseID}
+		args = []interface{}{startOfDay, endOfDay, *user.WarehouseID}
 	} else {
 		query = `
 			SELECT id, user_id, warehouse_id, total, profit, payment, change, created_at 
@@ -220,20 +220,20 @@ func GetTransactionItems(transactionID int) ([]TransactionItem, error) {
 }
 
 // GetDailyTotal mengambil total penjualan harian
-func GetDailyTotal(date time.Time) (float64, float64, int, error) {
+func GetDailyTotal(user *User, date time.Time) (float64, float64, int, error) {
 	startOfDay := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	var query string
 	var args []interface{}
 
-	if CurrentUser != nil && !CurrentUser.IsAdmin() && CurrentUser.WarehouseID != nil {
+	if user != nil && !user.IsAdmin() && user.WarehouseID != nil {
 		query = `
 			SELECT COALESCE(SUM(total), 0), COALESCE(SUM(profit), 0), COUNT(*) 
 			FROM transactions 
 			WHERE created_at >= $1 AND created_at < $2 AND warehouse_id = $3
 		`
-		args = []interface{}{startOfDay, endOfDay, *CurrentUser.WarehouseID}
+		args = []interface{}{startOfDay, endOfDay, *user.WarehouseID}
 	} else {
 		query = `
 			SELECT COALESCE(SUM(total), 0), COALESCE(SUM(profit), 0), COUNT(*) 

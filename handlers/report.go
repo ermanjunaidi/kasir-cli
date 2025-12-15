@@ -46,13 +46,13 @@ func selectDateReport() {
 }
 
 func showDailyReport(date time.Time) {
-	transactions, err := models.GetTransactionsByDate(date)
+	transactions, err := models.GetTransactionsByDate(models.CurrentUser, date)
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n", err)
 		return
 	}
 
-	total, profit, count, err := models.GetDailyTotal(date)
+	total, profit, count, err := models.GetDailyTotal(models.CurrentUser, date)
 	if err != nil {
 		fmt.Printf("❌ Error: %v\n", err)
 		return

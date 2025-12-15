@@ -2,7 +2,9 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
+	"kasir/api"
 	"kasir/config"
 	"kasir/handlers"
 	"kasir/models"
@@ -11,6 +13,11 @@ import (
 )
 
 func main() {
+	// Parse flags
+	apiMode := flag.Bool("api", false, "Run in API mode")
+	port := flag.String("port", "8080", "Port for API server")
+	flag.Parse()
+
 	// Banner
 	printBanner()
 
@@ -30,6 +37,13 @@ func main() {
 	defer config.CloseDB()
 	fmt.Println("✅ Koneksi database berhasil!")
 
+	// Check if API mode
+	if *apiMode {
+		api.StartServer(*port)
+		return
+	}
+
+	// CLI Mode below...
 	// Login loop
 	reader := bufio.NewReader(os.Stdin)
 	for {
