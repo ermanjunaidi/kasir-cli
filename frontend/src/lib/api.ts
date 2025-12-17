@@ -64,8 +64,13 @@ export const api = {
         return res.json();
     },
 
-    getProducts: async (): Promise<Product[]> => {
-        const res = await fetch(`${API_URL}/products`, {
+    getProducts: async (params?: { page?: number; limit?: number; search?: string }): Promise<{ data: Product[]; meta: { current_page: number; limit: number; total_items: number; total_pages: number } }> => {
+        const query = new URLSearchParams();
+        if (params?.page) query.append("page", params.page.toString());
+        if (params?.limit) query.append("limit", params.limit.toString());
+        if (params?.search) query.append("search", params.search);
+
+        const res = await fetch(`${API_URL}/products?${query.toString()}`, {
             headers: getAuthHeaders(),
         });
         if (!res.ok) throw new Error("Failed to fetch products");
@@ -149,7 +154,7 @@ export const api = {
 };
 
 // Hooks
-export const useProducts = () => useQuery({ queryKey: ["products"], queryFn: api.getProducts });
+export const useProducts = (params?: { page?: number; limit?: number; search?: string }) => useQuery({ queryKey: ["products", params], queryFn: () => api.getProducts(params) });
 export const useTransactions = () => useQuery({ queryKey: ["transactions"], queryFn: api.getTransactions });
 export const useUsers = () => useQuery({ queryKey: ["users"], queryFn: api.getUsers });
 export const useWarehouses = () => useQuery({ queryKey: ["warehouses"], queryFn: api.getWarehouses });

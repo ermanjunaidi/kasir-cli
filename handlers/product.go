@@ -47,7 +47,7 @@ func ProductMenu() {
 		if models.CurrentUser != nil && models.CurrentUser.IsAdmin() {
 			switch choice {
 			case "1":
-				listAllProducts()
+				ListAllProducts()
 			case "2":
 				listStockByWarehouse()
 			case "3":
@@ -68,7 +68,7 @@ func ProductMenu() {
 		} else {
 			switch choice {
 			case "1":
-				listProducts()
+				ListProducts()
 			case "2":
 				addProduct()
 			case "3":
@@ -89,29 +89,88 @@ func readInput() string {
 	return strings.TrimSpace(input)
 }
 
-// listAllProducts menampilkan semua produk dari semua gudang (admin)
-func listAllProducts() {
-	warehouses, _ := models.GetAllWarehouses()
+// ListAllProducts menampilkan semua produk dengan pagination (admin)
+func ListAllProducts() {
+	page := 1
+	limit := 10
+	search := ""
 
-	fmt.Println("\n╔══════════════════════════════════════════════════════════════════════════════════╗")
-	fmt.Println("║                           DAFTAR PRODUK SEMUA GUDANG                            ║")
-	fmt.Println("╚══════════════════════════════════════════════════════════════════════════════════╝")
+	for {
+		products, total, err := models.GetProducts(page, limit, search, nil)
+		if err != nil {
+			fmt.Printf("❌ Error: %v\n", err)
+			return
+		}
 
-	for _, w := range warehouses {
-		products, _ := models.GetProductsByWarehouse(w.ID)
+		totalPages := (total + limit - 1) / limit
+		if totalPages == 0 {
+			totalPages = 1
+		}
+
+		fmt.Println("\n╔═════════════════════════════════════════════════════════════════════════════════════════════╗")
+		fmt.Println("║                                  DAFTAR SEMUA PRODUK                                    ║")
+		fmt.Println("╚═════════════════════════════════════════════════════════════════════════════════════════════╝")
+		fmt.Printf("🔍 Search: %-20s  📄 Page: %d/%d  📦 Total: %d\n",
+			func() string {
+				if search == "" {
+					return "(none)"
+				} else {
+					return search
+				}
+			}(),
+			page, totalPages, total)
+
+		fmt.Println("┌─────┬──────────────────────┬─────────────┬─────────────┬──────┬─────────────────────────┐")
+		fmt.Println("│ ID  │ Nama Produk          │ Hrg Beli    │ Hrg Jual    │ Stok │ Gudang                  │")
+		fmt.Println("├─────┼──────────────────────┼─────────────┼─────────────┼──────┼─────────────────────────┤")
+
 		if len(products) == 0 {
-			continue
+			fmt.Println("│                        T I D A K   A D A   D A T A                              │")
 		}
 
-		fmt.Printf("\n📦 %s\n", w.Name)
-		fmt.Println("┌─────┬────────────────────────┬───────────────┬───────────────┬────────┐")
-		fmt.Println("│ ID  │ Nama Produk            │ Hrg Beli      │ Hrg Jual      │ Stok   │")
-		fmt.Println("├─────┼────────────────────────┼───────────────┼───────────────┼────────┤")
 		for _, p := range products {
-			fmt.Printf("│ %-3d │ %-22s │ %13s │ %13s │ %6d │\n",
-				p.ID, truncate(p.Name, 22), formatRupiah(p.PurchasePrice), formatRupiah(p.SellingPrice), p.Stock)
+			warehouseName := "?"
+			w, _ := models.GetWarehouseByID(p.WarehouseID)
+			if w != nil {
+				warehouseName = w.Name
+			}
+
+			fmt.Printf("│ %-3d │ %-20s │ %11s │ %11s │ %4d │ %-23s │\n",
+				p.ID, truncate(p.Name, 20), formatRupiah(p.PurchasePrice), formatRupiah(p.SellingPrice), p.Stock, truncate(warehouseName, 23))
 		}
-		fmt.Println("└─────┴────────────────────────┴───────────────┴───────────────┴────────┘")
+		fmt.Println("└─────┴──────────────────────┴─────────────┴─────────────┴──────┴─────────────────────────┘")
+
+		fmt.Println("\n[n] Next  [p] Prev  [s] Search  [q] Back")
+		fmt.Print("Pilihan: ")
+		input := readInput()
+
+		switch strings.ToLower(input) {
+		case "n":
+			if page < totalPages {
+				page++
+			} else {
+				fmt.Println("⚠️  Sudah di halaman terakhir")
+			}
+		case "p":
+			if page > 1 {
+				page--
+			} else {
+				fmt.Println("⚠️  Sudah di halaman pertama")
+			}
+		case "s":
+			fmt.Print("Masukkan kata kunci: ")
+			search = readInput()
+			page = 1 // Reset ke halaman 1 saat search baru
+		case "q":
+			return
+		default:
+			// check if number
+			if pNum, err := strconv.Atoi(input); err == nil && len(input) > 0 {
+				if pNum >= 1 && pNum <= totalPages {
+					page = pNum
+				}
+			}
+		}
 	}
 }
 
@@ -154,25 +213,87 @@ func listStockByWarehouse() {
 	fmt.Println("└────────────────────────────┴───────────────┴───────────────┴───────────────────┘")
 }
 
-func listProducts() {
-	products, err := models.GetAllProducts()
-	if err != nil {
-		fmt.Printf("❌ Error: %v\n", err)
-		return
+func ListProducts() {
+	page := 1
+	limit := 10
+	search := ""
+
+	// Ensure we have user warehouse ID if not admin
+	var warehouseID *int
+	if models.CurrentUser != nil && !models.CurrentUser.IsAdmin() {
+		warehouseID = models.CurrentUser.WarehouseID
 	}
 
-	if len(products) == 0 {
-		fmt.Println("\n⚠️  Belum ada produk. Silakan tambah produk terlebih dahulu.")
-		return
-	}
+	for {
+		products, total, err := models.GetProducts(page, limit, search, warehouseID)
+		if err != nil {
+			fmt.Printf("❌ Error: %v\n", err)
+			return
+		}
 
-	fmt.Println("\n┌─────┬────────────────────────┬───────────────┬────────┐")
-	fmt.Println("│ ID  │ Nama Produk            │ Harga         │ Stok   │")
-	fmt.Println("├─────┼────────────────────────┼───────────────┼────────┤")
-	for _, p := range products {
-		fmt.Printf("│ %-3d │ %-22s │ %13s │ %6d │\n", p.ID, truncate(p.Name, 22), formatRupiah(p.SellingPrice), p.Stock)
+		totalPages := (total + limit - 1) / limit
+		if totalPages == 0 {
+			totalPages = 1
+		}
+
+		fmt.Println("\n╔══════════════════════════════════════════════════════════╗")
+		fmt.Println("║                   DAFTAR PRODUK                          ║")
+		fmt.Println("╚══════════════════════════════════════════════════════════╝")
+		fmt.Printf("🔍 Search: %-15s  📄 Page: %d/%d  📦 Total: %d\n",
+			func() string {
+				if search == "" {
+					return "(none)"
+				} else {
+					return search
+				}
+			}(),
+			page, totalPages, total)
+
+		fmt.Println("┌─────┬────────────────────────┬───────────────┬────────┐")
+		fmt.Println("│ ID  │ Nama Produk            │ Harga         │ Stok   │")
+		fmt.Println("├─────┼────────────────────────┼───────────────┼────────┤")
+
+		if len(products) == 0 {
+			fmt.Println("│               T I D A K   A D A   D A T A             │")
+		}
+
+		for _, p := range products {
+			fmt.Printf("│ %-3d │ %-22s │ %13s │ %6d │\n", p.ID, truncate(p.Name, 22), formatRupiah(p.SellingPrice), p.Stock)
+		}
+		fmt.Println("└─────┴────────────────────────┴───────────────┴────────┘")
+
+		fmt.Println("\n[n] Next  [p] Prev  [s] Search  [q] Back")
+		fmt.Print("Pilihan: ")
+		input := readInput()
+
+		switch strings.ToLower(input) {
+		case "n":
+			if page < totalPages {
+				page++
+			} else {
+				fmt.Println("⚠️  Sudah di halaman terakhir")
+			}
+		case "p":
+			if page > 1 {
+				page--
+			} else {
+				fmt.Println("⚠️  Sudah di halaman pertama")
+			}
+		case "s":
+			fmt.Print("Masukkan kata kunci: ")
+			search = readInput()
+			page = 1 // Reset ke halaman 1 saat search baru
+		case "q":
+			return
+		default:
+			// check if number
+			if pNum, err := strconv.Atoi(input); err == nil && len(input) > 0 {
+				if pNum >= 1 && pNum <= totalPages {
+					page = pNum
+				}
+			}
+		}
 	}
-	fmt.Println("└─────┴────────────────────────┴───────────────┴────────┘")
 }
 
 func truncate(s string, maxLen int) string {
@@ -251,7 +372,7 @@ func addProduct() {
 }
 
 func editProduct() {
-	listProducts()
+	ListProducts()
 
 	fmt.Print("\nMasukkan ID produk yang akan diedit: ")
 	idStr := readInput()
@@ -327,7 +448,7 @@ func editProduct() {
 }
 
 func deleteProduct() {
-	listProducts()
+	ListProducts()
 
 	fmt.Print("\nMasukkan ID produk yang akan dihapus: ")
 	idStr := readInput()

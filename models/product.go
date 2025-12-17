@@ -164,7 +164,69 @@ func UpdateStock(id int, quantity int) error {
 	return nil
 }
 
+
 // GetProfit menghitung profit per item
 func (p *Product) GetProfit() float64 {
 	return p.SellingPrice - p.PurchasePrice
+}
+
+// GetProducts mengambil produk dengan pagination dan search
+func GetProducts(page, limit int, search string, warehouseID *int) ([]Product, int, error) {
+	offset := (page - 1) * limit
+	var query string
+	var countQuery string
+	var args []interface{}
+	
+	baseQuery := "FROM products WHERE 1=1"
+	
+	// Add warehouse filter
+	argCount := 1
+	if warehouseID != nil {
+		baseQuery += fmt.Sprintf(" AND warehouse_id = $%d", argCount)
+		args = append(args, *warehouseID)
+		argCount++
+	}
+	
+	// Add search filter
+	if search != "" {
+		baseQuery += fmt.Sprintf(" AND name ILIKE $%d", argCount)
+		args = append(args, "%"+search+"%")
+		argCount++
+	}
+
+	// Count total
+	countQuery = "SELECT COUNT(*) " + baseQuery
+	var total int
+	err := config.DB.QueryRow(countQuery, args...).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	// Get data
+	query = fmt.Sprintf(`
+		SELECT id, name, purchase_price, selling_price, stock, warehouse_id, created_at 
+		%s 
+		ORDER BY id 
+		LIMIT $%d OFFSET $%d
+	`, baseQuery, argCount, argCount+1)
+	
+	args = append(args, limit, offset)
+
+	rows, err := config.DB.Query(query, args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var products []Product
+	for rows.Next() {
+		var p Product
+		err := rows.Scan(&p.ID, &p.Name, &p.PurchasePrice, &p.SellingPrice, &p.Stock, &p.WarehouseID, &p.CreatedAt)
+		if err != nil {
+			return nil, 0, err
+		}
+		products = append(products, p)
+	}
+	
+	return products, total, nil
 }

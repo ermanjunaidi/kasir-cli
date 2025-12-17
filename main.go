@@ -96,7 +96,7 @@ func main() {
 			case "1":
 				handlers.TransactionMenu()
 			case "2":
-				listProductsOnly()
+				handlers.ListProducts()
 			case "3":
 				handlers.ReportMenu()
 			case "4":
@@ -169,27 +169,6 @@ func logout() {
 	username := models.CurrentUser.Username
 	models.Logout()
 	fmt.Printf("\n👋 Sampai jumpa, %s!\n", username)
-}
-
-func listProductsOnly() {
-	products, err := models.GetAllProducts()
-	if err != nil {
-		fmt.Printf("❌ Error: %v\n", err)
-		return
-	}
-
-	if len(products) == 0 {
-		fmt.Println("\n⚠️  Belum ada produk.")
-		return
-	}
-
-	fmt.Println("\n┌─────┬────────────────────────┬───────────────┬────────┐")
-	fmt.Println("│ ID  │ Nama Produk            │ Harga         │ Stok   │")
-	fmt.Println("├─────┼────────────────────────┼───────────────┼────────┤")
-	for _, p := range products {
-		fmt.Printf("│ %-3d │ %-22s │ %13s │ %6d │\n", p.ID, truncate(p.Name, 22), formatRupiahMain(p.SellingPrice), p.Stock)
-	}
-	fmt.Println("└─────┴────────────────────────┴───────────────┴────────┘")
 }
 
 func formatRupiahMain(amount float64) string {

@@ -62,7 +62,12 @@ export default function Dashboard() {
 }
 
 function POSContent() {
-    const { data: products } = useProducts();
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState("");
+    const { data: productsData } = useProducts({ page, limit: 12, search });
+    const products = productsData?.data || [];
+    const meta = productsData?.meta;
+
     const [cart, setCart] = useState<CartItem[]>([]);
     const [payment, setPayment] = useState("");
     const queryClient = useQueryClient();
@@ -110,6 +115,9 @@ function POSContent() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="md:col-span-2 space-y-4">
                 <h2 className="text-xl font-semibold mb-4">Katalog Produk</h2>
+                <div className="flex gap-2">
+                    <Input placeholder="Cari produk..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
+                </div>
                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 {products?.map((product) => (
                     <Card key={product.ID} className="cursor-pointer hover:shadow-lg transition" onClick={() => addToCart(product)}>
@@ -123,6 +131,13 @@ function POSContent() {
                     </Card>
                 ))}
                 </div>
+                {meta && (
+                     <div className="flex justify-between items-center mt-4">
+                        <Button variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+                        <span>Page {meta.current_page} of {meta.total_pages}</span>
+                        <Button variant="outline" onClick={() => setPage(p => Math.min(meta.total_pages, p + 1))} disabled={page === meta.total_pages}>Next</Button>
+                    </div>
+                )}
             </div>
             <div className="md:col-span-1">
                 <Card className="sticky top-6">
@@ -155,7 +170,11 @@ function POSContent() {
 }
 
 function ProductsContent() {
-    const { data: products } = useProducts();
+    const [page, setPage] = useState(1);
+    const [search, setSearch] = useState("");
+    const { data: productsData } = useProducts({ page, limit: 10, search });
+    const products = productsData?.data;
+    const meta = productsData?.meta;
     const queryClient = useQueryClient();
     const [isCreating, setIsCreating] = useState(false);
     
@@ -181,6 +200,10 @@ function ProductsContent() {
             <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold">Manajemen Produk</h2>
                 <Button onClick={() => setIsCreating(!isCreating)}><Plus className="mr-2 h-4 w-4" /> Tambah Produk</Button>
+            </div>
+            
+            <div className="flex gap-2 w-full md:w-1/3">
+                 <Input placeholder="Cari produk..." value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
             </div>
 
             {isCreating && (
@@ -222,6 +245,13 @@ function ProductsContent() {
                     </tbody>
                 </table>
             </div>
+            {meta && (
+                 <div className="flex justify-between items-center mt-4">
+                    <Button variant="outline" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Prev</Button>
+                    <span>Page {meta.current_page} of {meta.total_pages}</span>
+                    <Button variant="outline" onClick={() => setPage(p => Math.min(meta.total_pages, p + 1))} disabled={page === meta.total_pages}>Next</Button>
+                </div>
+            )}
         </div>
     )
 }

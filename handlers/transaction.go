@@ -30,7 +30,7 @@ func TransactionMenu() {
 		choice := readInput()
 		switch choice {
 		case "1":
-			listProducts()
+			ListProducts()
 		case "2":
 			addToCart(&cart)
 		case "3":
@@ -56,7 +56,7 @@ func TransactionMenu() {
 }
 
 func addToCart(cart *[]models.CartItem) {
-	listProducts()
+	ListProducts()
 
 	for {
 		fmt.Print("\nMasukkan ID produk (atau '0' untuk kembali): ")

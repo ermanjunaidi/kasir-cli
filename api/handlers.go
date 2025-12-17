@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"kasir/models"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -87,12 +88,41 @@ func handleProducts(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
-		products, err := models.GetAllProducts()
+		pageStr := r.URL.Query().Get("page")
+		limitStr := r.URL.Query().Get("limit")
+		search := r.URL.Query().Get("search")
+
+		page := 1
+		limit := 10
+
+		if pageStr != "" {
+			if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+				page = p
+			}
+		}
+		if limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				limit = l
+			}
+		}
+
+		products, total, err := models.GetProducts(page, limit, search, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		json.NewEncoder(w).Encode(products)
+
+		response := map[string]interface{}{
+			"data": products,
+			"meta": map[string]interface{}{
+				"current_page": page,
+				"limit":        limit,
+				"total_items":  total,
+				"total_pages":  (total + limit - 1) / limit,
+			},
+		}
+
+		json.NewEncoder(w).Encode(response)
 
 	case http.MethodPost:
 		var req struct {
@@ -133,53 +163,24 @@ func handleProducts(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(map[string]string{"message": "Product updated"})
 
 	case http.MethodDelete:
-		idStr := r.URL.Query().Get("id")
-		// Simple integer parsing check
-		// In a real router like Chi or Mux you'd get params easier.
-		// Here we assume query string ?id=...
-		// But let's check body too if client prefers sending JSON.
-		// For simplicity let's stick to helper logic.
-		// Actually let's assume the user sends JSON with ID for consistency, or query param.
-		// Query param is standard for DELETE in simple APIs.
-		// However, standard http.ServeMux doesn't parse path vars easily.
-		// We'll use Query param.
-		if idStr == "" {
-			var req struct { ID int `json:"id"` }
-			if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
-				// weak but works
-			}
+		// Delete using JSON body to be consistent with other endpoints
+		var req struct {
+			ID int `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
 		}
 
-		if idStr == "" {
-             http.Error(w, "Missing ID", http.StatusBadRequest)
-             return
-        }
-        
-        // This effectively needs strconv
-        // We need to import "strconv"
-        // Let's rely on JSON body for DELETE to avoid importing strconv if not present,
-        // OR add strconv to imports.
-        // It's cleaner to use JSON body for everything in this context.
-        var req struct { ID int `json:"id"` }
-        // If body is empty, we fail. That's fine.
-        // Re-read body? No, it's a stream.
-        // Let's assume the client sends JSON { "id": 1 }
-        // Wait, I can't re-read if I tried above.
-        // Let's just fix imports later. I will add strconv to imports.
-        // Actually, let's just use JSON body for DELETE.
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-             http.Error(w, "Bad request", http.StatusBadRequest)
-             return
-        }
 		err := models.DeleteProduct(req.ID)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		json.NewEncoder(w).Encode(map[string]string{"message": "Product deleted"})
-        
-    default:
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -210,111 +211,122 @@ func handleUsers(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		json.NewEncoder(w).Encode(u)
-    case http.MethodDelete:
-        var req struct { ID int `json:"id"` }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	case http.MethodDelete:
+		var req struct {
+			ID int `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			http.Error(w, "Bad request", http.StatusBadRequest)
 			return
 		}
-        err := models.DeleteUser(req.ID)
-        if err != nil {
+		err := models.DeleteUser(req.ID)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-        json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
-    default:
-         http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(map[string]string{"message": "User deleted"})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
 func handleWarehouses(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "application/json")
-    switch r.Method {
-    case http.MethodGet:
-        data, err := models.GetAllWarehouses()
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
-        json.NewEncoder(w).Encode(data)
-    case http.MethodPost:
-        var req struct { Name string `json:"name"`; Address string `json:"address"` }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-            http.Error(w, "Bad Request", http.StatusBadRequest)
-            return
-        }
-        wObj, err := models.CreateWarehouse(req.Name, req.Address)
-        if err != nil {
-            http.Error(w, err.Error(), http.StatusInternalServerError)
-            return
-        }
-        json.NewEncoder(w).Encode(wObj)
-    case http.MethodDelete:
-        var req struct { ID int `json:"id"` }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-             http.Error(w, "Bad Request", http.StatusBadRequest)
-             return
-        }
-        err := models.DeleteWarehouse(req.ID)
-        if err != nil {
-             http.Error(w, err.Error(), http.StatusInternalServerError)
-             return
-        }
-        json.NewEncoder(w).Encode(map[string]string{"message": "Warehouse deleted"})
-    case http.MethodPut:
-        var req struct { ID int `json:"id"`; Name string `json:"name"`; Address string `json:"address"` }
-        if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-             http.Error(w, "Bad Request", http.StatusBadRequest)
-             return
-        }
-        err := models.UpdateWarehouse(req.ID, req.Name, req.Address)
-        if err != nil {
-             http.Error(w, err.Error(), http.StatusInternalServerError)
-             return
-        }
-        json.NewEncoder(w).Encode(map[string]string{"message": "Warehouse updated"})
-    default:
-        http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-    }
+	w.Header().Set("Content-Type", "application/json")
+	switch r.Method {
+	case http.MethodGet:
+		data, err := models.GetAllWarehouses()
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(data)
+	case http.MethodPost:
+		var req struct {
+			Name    string `json:"name"`
+			Address string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		wObj, err := models.CreateWarehouse(req.Name, req.Address)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(wObj)
+	case http.MethodDelete:
+		var req struct {
+			ID int `json:"id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		err := models.DeleteWarehouse(req.ID)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"message": "Warehouse deleted"})
+	case http.MethodPut:
+		var req struct {
+			ID      int    `json:"id"`
+			Name    string `json:"name"`
+			Address string `json:"address"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, "Bad Request", http.StatusBadRequest)
+			return
+		}
+		err := models.UpdateWarehouse(req.ID, req.Name, req.Address)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]string{"message": "Warehouse updated"})
+	default:
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func handleReports(w http.ResponseWriter, r *http.Request) {
-    user, err := getUserFromRequest(r)
-    if err != nil {
-        http.Error(w, "Unauthorized", http.StatusUnauthorized)
-        return
-    }
+	user, err := getUserFromRequest(r)
+	if err != nil {
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+		return
+	}
 
-    dateStr := r.URL.Query().Get("date")
-    if dateStr == "" {
-        dateStr = time.Now().Format("02-01-2006")
-    }
-    date, err := time.Parse("02-01-2006", dateStr)
-    if err != nil {
-        http.Error(w, "Invalid date format DD-MM-YYYY", http.StatusBadRequest)
-        return
-    }
+	dateStr := r.URL.Query().Get("date")
+	if dateStr == "" {
+		dateStr = time.Now().Format("02-01-2006")
+	}
+	date, err := time.Parse("02-01-2006", dateStr)
+	if err != nil {
+		http.Error(w, "Invalid date format DD-MM-YYYY", http.StatusBadRequest)
+		return
+	}
 
-    transactions, err := models.GetTransactionsByDate(user, date)
-    if err != nil {
-        http.Error(w, err.Error(), http.StatusInternalServerError)
-        return
-    }
-    
-    total, profit, count, _ := models.GetDailyTotal(user, date)
+	transactions, err := models.GetTransactionsByDate(user, date)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
-    resp := map[string]interface{}{
-        "date": dateStr,
-        "summary": map[string]interface{}{
-            "total_sales": total,
-            "total_profit": profit,
-            "transaction_count": count,
-        },
-        "transactions": transactions,
-    }
+	total, profit, count, _ := models.GetDailyTotal(user, date)
 
-    w.Header().Set("Content-Type", "application/json")
-    json.NewEncoder(w).Encode(resp)
+	resp := map[string]interface{}{
+		"date": dateStr,
+		"summary": map[string]interface{}{
+			"total_sales":       total,
+			"total_profit":      profit,
+			"transaction_count": count,
+		},
+		"transactions": transactions,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 func handleTransactions(w http.ResponseWriter, r *http.Request) {
